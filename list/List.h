@@ -1,4 +1,3 @@
-#pragma once;
 #include <iostream>
 using namespace std;
 template<class T>
@@ -6,12 +5,47 @@ class Node
 {
 public:
 	Node* pNext;
+	Node* pPrev;
 	T data;
 
-	Node(T data = T(), Node* pNext = nullptr)
+	Node(T data = T(), Node* pNext = nullptr, Node* pPrev = nullptr)
 	{
 		this->data = data;
 		this->pNext = pNext;
+		this->pPrev = pPrev;
+	}
+	template<class T>
+	friend class ListIterator;
+};
+template<class T>
+class ListIterator
+{
+protected:
+	Node<T>* i;
+public:
+	ListIterator(Node<T>* _n) : i(_n) {}
+	ListIterator(ListIterator<T>& _v) : i(_v.i) {}
+	~ListIterator() {}
+
+	bool CanMove() { return (i != nullptr); }
+	void Move() { i = i->pNext; }
+
+	bool operator==(const ListIterator<T>& _v) { return i == _v.i; }
+	bool operator!=(const ListIterator<T>& _v) { return !((*this) == _v); }
+
+	ListIterator<T> operator++(int)
+	{
+		if (!CanMove())
+			throw logic_error("reached end");
+		Move();
+		return (*this);
+	}
+	ListIterator<T>& operator=(const ListIterator<T>& _v) { i = _v.i; return (*this); }
+
+	T& operator* () {
+		if (i != nullptr)
+			return i->data;
+		else throw - 1;
 	}
 };
 template<class T>
@@ -35,13 +69,20 @@ public:
 	{
 		Size = 0;
 		head = nullptr;
+		tail = nullptr;
 	}
 	List(List<T>& _l)
 	{
+		ListIterator<T> k = _l.begin();
 		Size = 0;
 		head = nullptr;
+		tail = nullptr;
 		for (int i = 0; i < _l.Size; i++)
-			push_back(_l[i]);
+		{
+			push_back(*k);
+			if (k.CanMove())
+				k++;
+		}
 	}
 	~List()
 	{
@@ -50,33 +91,22 @@ public:
 
 	int GetSize() const { return Size; }
 
-	T& operator[](const int index)
-	{
-		if (index < 0 || index >= Size)
-			throw length_error("incorrect index");
-
-		int counter = 0;
-		Node<T>* current = this->head;
-		while (current != nullptr)
-		{
-			if (counter == index)
-				return current->data;
-			current = current->pNext;
-			counter++;
-		}
-	}
+	ListIterator<T> begin() { return ListIterator<T>(head); }
+	ListIterator<T> end() { return ListIterator<T>(tail); }
 
 	void push_back(T data)
 	{
 		if (head == nullptr)
+		{
 			head = new Node<T>(data);
+			tail = head;
+		}
 		else
 		{
-			Node<T>* current = this->head;
-			while (current->pNext != nullptr)
-				current = current->pNext;
-			current->pNext = new Node<T>(data);
-		};
+			Node<T>* current = this->tail;
+			current->pNext = new Node<T>(data, nullptr, current);
+			tail = current->pNext;
+		}
 
 		Size++;
 	}
@@ -88,6 +118,12 @@ public:
 
 		Node<T>* temp = head;
 		head = head->pNext;
+
+		if (head != nullptr)
+			head->pPrev = nullptr;
+		else
+			tail = tail->pPrev;
+
 		delete temp;
 		Size--;
 	}
@@ -100,8 +136,15 @@ public:
 
 	void push_front(T data)
 	{
-		head = new Node<T>(data, head);
-		Size++;
+		if (head == nullptr)
+			push_back(data);
+		else
+		{
+			Node<T>* temp = head;
+			head = new Node<T>(data, head);
+			temp->pPrev = head;
+			Size++;
+		}
 	}
 
 	void insert(T data, int index)
@@ -111,13 +154,16 @@ public:
 
 		if (index == 0)
 			push_front(data);
+		else if (index == Size)
+			push_back(data);
 		else
 		{
 			Node<T>* previous = find_prev(index);
 
-			Node<T>* newNode = new Node<T>(data, previous->pNext);
+			Node<T>* newNode = new Node<T>(data, previous->pNext, previous);
+			previous->pNext->pPrev = newNode;
 			previous->pNext = newNode;
-			
+
 			Size++;
 		}
 	}
@@ -129,11 +175,14 @@ public:
 
 		if (index == 0)
 			pop_front();
+		else if (index == Size - 1)
+			pop_back();
 		else
 		{
 			Node<T>* previous = find_prev(index);
 
 			Node<T>* toDelete = previous->pNext;
+			toDelete->pNext->pPrev = previous;
 			previous->pNext = toDelete->pNext;
 
 			delete toDelete;
@@ -146,15 +195,28 @@ public:
 		if (Size == 0)
 			throw logic_error("list empty");
 
-		remove(Size - 1);
+		Node<T>* temp = tail;
+		tail = tail->pPrev;
+
+		if (tail != nullptr)
+			tail->pNext = nullptr;
+		else
+			head = head->pNext;
+
+		delete temp;
+		Size--;
 	}
 
 	friend ostream& operator << (ostream& ostr, List<T>& _l)
 	{
+		ListIterator<T> k = _l.begin();
 		ostr << "{";
-			for (int i = 0; i < _l.GetSize() - 1; i++)
-				ostr << _l[i] << ", ";
-		ostr << _l[_l.GetSize() - 1] << "}";
+		for (int i = 0; i < _l.GetSize() - 1; i++)
+		{
+			ostr << *k << ", ";
+			k++;
+		}
+		ostr << *k << "}";
 
 		return ostr;
 	}

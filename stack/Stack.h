@@ -24,7 +24,8 @@ public:
 	}
 	T pop()
 	{
-		T temp = data[0];
+		ListIterator<int> i = data.begin();
+		T temp = *i;
 		data.pop_front();
 
 		return(temp);
